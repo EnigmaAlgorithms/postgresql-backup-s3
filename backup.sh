@@ -5,12 +5,12 @@ set -o pipefail
 
 >&2 echo "-----"
 
-if [ "${S3_ACCESS_KEY_ID}" = "**None**" ]; then
+if [ "${S3_ACCESS_KEY_ID}" = "**None**" -a "${S3_ACCESS_KEY_ID_FILE}" = "**None**" ]; then
   echo "You need to set the S3_ACCESS_KEY_ID environment variable."
   exit 1
 fi
 
-if [ "${S3_SECRET_ACCESS_KEY}" = "**None**" ]; then
+if [ "${S3_SECRET_ACCESS_KEY}" = "**None**" -a "${S3_SECRET_ACCESS_KEY_FILE}" = "**None**" ]; then
   echo "You need to set the S3_SECRET_ACCESS_KEY environment variable."
   exit 1
 fi
@@ -20,8 +20,8 @@ if [ "${S3_BUCKET}" = "**None**" ]; then
   exit 1
 fi
 
-if [ "${POSTGRES_DATABASE}" = "**None**" ]; then
-  echo "You need to set the POSTGRES_DATABASE environment variable."
+if [ "${POSTGRES_DB}" = "**None**" -a "${POSTGRES_DB_FILE}" = "**None**" ]; then
+  echo "You need to set the POSTGRES_DB environment variable."
   exit 1
 fi
 
@@ -35,12 +35,12 @@ if [ "${POSTGRES_HOST}" = "**None**" ]; then
   fi
 fi
 
-if [ "${POSTGRES_USER}" = "**None**" ]; then
+if [ "${POSTGRES_USER}" = "**None**" -a "${POSTGRES_USER_FILE}" = "**None**" ]; then
   echo "You need to set the POSTGRES_USER environment variable."
   exit 1
 fi
 
-if [ "${POSTGRES_PASSWORD}" = "**None**" ]; then
+if [ "${POSTGRES_PASSWORD}" = "**None**" -a "${POSTGRES_PASSWORD_FILE}" = "**None**" ]; then
   echo "You need to set the POSTGRES_PASSWORD environment variable or link to a container named POSTGRES."
   exit 1
 fi
@@ -51,20 +51,65 @@ else
   AWS_ARGS="--endpoint-url ${S3_ENDPOINT}"
 fi
 
-# env vars needed for aws tools
-export AWS_ACCESS_KEY_ID=$S3_ACCESS_KEY_ID
-export AWS_SECRET_ACCESS_KEY=$S3_SECRET_ACCESS_KEY
+#Process vars
+if [ "${POSTGRES_DB_FILE}" = "**None**" ]; then
+  POSTGRES_DB=$(echo "${POSTGRES_DB}" | tr , " ")
+elif [ -r "${POSTGRES_DB_FILE}" ]; then
+  POSTGRES_DB=$(cat "${POSTGRES_DB_FILE}")
+else
+  echo "Missing POSTGRES_DB_FILE file."
+  exit 1
+fi
+if [ "${POSTGRES_USER_FILE}" = "**None**" ]; then
+  export PGUSER="${POSTGRES_USER}"
+elif [ -r "${POSTGRES_USER_FILE}" ]; then
+  export PGUSER=$(cat "${POSTGRES_USER_FILE}")
+else
+  echo "Missing POSTGRES_USER_FILE file."
+  exit 1
+fi
+if [ "${POSTGRES_PASSWORD_FILE}" = "**None**" ]; then
+  export PGPASSWORD="${POSTGRES_PASSWORD}"
+elif [ -r "${POSTGRES_PASSWORD_FILE}" ]; then
+  export PGPASSWORD=$(cat "${POSTGRES_PASSWORD_FILE}")
+else
+  echo "Missing POSTGRES_PASSWORD_FILE file."
+  exit 1
+fi
+if [ "${S3_ACCESS_KEY_ID_FILE}" = "**None**" ]; then
+  export AWS_ACCESS_KEY_ID="${S3_ACCESS_KEY_ID}"
+elif [ -r "${S3_ACCESS_KEY_ID_FILE}" ]; then
+  export AWS_ACCESS_KEY_ID=$(cat "${S3_ACCESS_KEY_ID_FILE}")
+else
+  echo "Missing S3_ACCESS_KEY_ID_FILE file."
+  exit 1
+fi
+if [ "${S3_SECRET_ACCESS_KEY_FILE}" = "**None**" ]; then
+  export AWS_SECRET_ACCESS_KEY="${S3_SECRET_ACCESS_KEY}"
+elif [ -r "${S3_SECRET_ACCESS_KEY_FILE}" ]; then
+  export AWS_SECRET_ACCESS_KEY=$(cat "${S3_SECRET_ACCESS_KEY_FILE}")
+else
+  echo "Missing S3_SECRET_ACCESS_KEY_FILE file."
+  exit 1
+fi
+if [ "${ENCRYPTION_PASSWORD_FILE}" = "**None**" ]; then
+  ENCRYPTION_PASSWORD="${ENCRYPTION_PASSWORD}"
+elif [ -r "${ENCRYPTION_PASSWORD_FILE}" ]; then
+  ENCRYPTION_PASSWORD=$(cat "${ENCRYPTION_PASSWORD_FILE}")
+else
+  echo "Missing ENCRYPTION_PASSWORD_FILE file."
+  exit 1
+fi
 export AWS_DEFAULT_REGION=$S3_REGION
 
-export PGPASSWORD=$POSTGRES_PASSWORD
-POSTGRES_HOST_OPTS="-h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER $POSTGRES_EXTRA_OPTS"
+POSTGRES_HOST_OPTS="-h $POSTGRES_HOST -p $POSTGRES_PORT -U $PGUSER $POSTGRES_EXTRA_OPTS"
 
-echo "Creating dump of ${POSTGRES_DATABASE} database from ${POSTGRES_HOST}..."
+echo "Creating dump of ${POSTGRES_DB} database from ${POSTGRES_HOST}..."
 
 SRC_FILE=dump.sql.gz
-DEST_FILE=${POSTGRES_DATABASE}_$(date +"%Y-%m-%dT%H:%M:%SZ").sql.gz
+DEST_FILE=${POSTGRES_DB}_$(date +"%Y-%m-%dT%H:%M:%SZ").sql.gz
 
-pg_dump $POSTGRES_HOST_OPTS $POSTGRES_DATABASE | gzip > $SRC_FILE
+pg_dump $POSTGRES_HOST_OPTS $POSTGRES_DB | gzip > $SRC_FILE
 
 if [ "${ENCRYPTION_PASSWORD}" != "**None**" ]; then
   >&2 echo "Encrypting ${SRC_FILE}"
