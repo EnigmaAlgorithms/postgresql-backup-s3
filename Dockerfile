@@ -11,8 +11,8 @@ RUN apk update \
 	&& apk del curl \
 	&& rm -rf /var/cache/apk/*
 
-ENV POSTGRES_DATABASE **None**
-ENV POSTGRES_DATABASE_FILE **None**
+ENV POSTGRES_DB **None**
+ENV POSTGRES_DB_FILE **None**
 ENV POSTGRES_HOST **None**
 ENV POSTGRES_PORT 5432
 ENV POSTGRES_USER **None**
