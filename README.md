@@ -5,7 +5,7 @@ Backup PostgresSQL to S3 (supports periodic backups)
 ## Basic Usage
 
 ```sh
-$ docker run -e S3_ACCESS_KEY_ID=key -e S3_SECRET_ACCESS_KEY=secret -e S3_BUCKET=my-bucket -e S3_PREFIX=backup -e POSTGRES_DATABASE=dbname -e POSTGRES_USER=user -e POSTGRES_PASSWORD=password -e POSTGRES_HOST=localhost itbm/postgres-backup-s3
+$ docker run -e S3_ACCESS_KEY_ID=key -e S3_SECRET_ACCESS_KEY=secret -e S3_BUCKET=my-bucket -e S3_PREFIX=backup -e POSTGRES_DB=dbname -e POSTGRES_USER=user -e POSTGRES_PASSWORD=password -e POSTGRES_HOST=localhost itbm/postgres-backup-s3
 ```
 
 ## Kubernetes Deployment
@@ -38,7 +38,7 @@ spec:
         image: itbm/postgresql-backup-s3
         imagePullPolicy: Always
         env:
-        - name: POSTGRES_DATABASE
+        - name: POSTGRES_DB
           value: ""
         - name: POSTGRES_HOST
           value: ""
@@ -64,7 +64,7 @@ spec:
 
 ## Environment variables
 
-- `POSTGRES_DATABASE` list of databases you want to backup (default: --all-databases)
+- `POSTGRES_DB` the databases you want to backup *required*
 - `POSTGRES_HOST` the postgresql host *required*
 - `POSTGRES_PORT` the postgresql port (default: )
 - `POSTGRES_USER` the postgresql user *required*
@@ -80,6 +80,21 @@ spec:
 - `SCHEDULE` backup schedule time, see explainatons below
 - `ENCRYPTION_PASSWORD` password to encrypt the backup. Can be decrypted using `openssl aes-256-cbc -d -in backup.sql.gz.enc -out backup.sql.gz`
 - `DELETE_OLDER_THAN` delete old backups, see explanation and warning below
+
+### Docker Secrets
+
+This image supports docker secrets for the following variables:
+
+- `POSTGRES_DB`
+- `POSTGRES_USER`
+- `POSTGRES_PASSWORD`
+- `S3_ACCESS_KEY_ID`
+- `S3_SECRET_ACCESS_KEY`
+- `ENCRYPTION_PASSWORD`
+
+In order to use a docker secret just set the same environment viariable with `_FILE` appended to it. The value should point to the file containing the secret like `-e ENCRYPTION_PASSWORD_FILE="/run/secrets/backup-encryption-key"`
+
+Note: Variables set via their `_FILE` versions take precedence over the bare environment vairable.
 
 ### Automatic Periodic Backups
 
